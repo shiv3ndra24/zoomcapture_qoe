@@ -1,0 +1,36 @@
+[package]
+name = "zoom_capture"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# Retina-independent modules only (common, capture_logic) — see
+# src/lib.rs's doc comment for why this split exists: `cargo test --lib`
+# runs the real unit tests without also compiling main.rs's
+# retina-macro-generated code.
+name = "zoom_capture"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zoom_capture"
+path = "src/main.rs"
+
+[dependencies]
+# Retina crates — path deps because this crate is a workspace member,
+# same pattern as vpn_capture/Cargo.toml.
+retina-core = { path = "../core" }
+retina-filtergen = { path = "../filtergen" }
+retina-datatypes = { path = "../datatypes" }
+
+clap = { version = "3.2.23", features = ["derive"] }
+env_logger = "0.8.4"
+lazy_static = "1.4"
+crossbeam-channel = "0.5"
+dashmap = "6.0"
+chrono = "0.4"
+# NOTE: `pcap-file` was a dependency here for a standalone `pcap_offline`
+# binary that hand-parsed pcap/pcapng files directly (bypassing Retina)
+# to get exact per-packet capture timestamps. Removed in favor of
+# Retina's own offline replay mode instead — see README's "Running →
+# Offline" section for why, and for the one thing that trades away
+# (exact timestamps; not needed for now, per project decision).

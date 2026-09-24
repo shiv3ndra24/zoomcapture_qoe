@@ -1,0 +1,49 @@
+# DPDK / Retina runtime config for zoom_capture — LIVE (online) capture.
+# Copied from vpn_capture/config.toml as a starting point — adjust
+# `device` and `cores` to match the NIC you're actually capturing on
+# before running build.sh/run.sh.
+#
+# For offline replay of a .pcap/.pcapng file through this same binary,
+# see config.offline.toml instead — retina-core requires exactly one of
+# [online]/[offline] to be set (core/src/config.rs's `load_config()`
+# panics otherwise), so that's a separate file rather than a section to
+# toggle in this one.
+
+main_core = 0
+nb_memory_channels = 8
+
+[mempool]
+capacity  = 65536
+cache_size = 512
+
+[online]
+duration = 28800
+nb_rxd       = 8192
+promiscuous  = true
+mtu          = 1500
+hardware_assist = false
+dpdk_supl_args = ["--socket-mem=1024,0"]
+
+[[online.ports]]
+device = "0000:05:00.0"
+cores  = [1, 2, 3]
+# NOTE: this used to also have `rx_queues = [0, 1, 2]` here. Removed —
+# now that core/src/config.rs's real `PortMap` struct is confirmed, it
+# only has `device`, `cores`, and an optional `sink`. There's no
+# `rx_queues` field on a per-port config at all (RX queue count is
+# implicitly `cores.len()`, one queue per polling core); the line was
+# silently ignored by serde (unknown TOML fields aren't rejected by
+# default) rather than doing anything, so it was dead config left over
+# from copying vpn_capture's template before this schema was confirmed.
+
+[conntrack]
+max_connections      = 5000000
+max_out_of_order     = 1000
+timeout_resolution   = 100
+udp_inactivity_timeout  = 60000
+tcp_inactivity_timeout  = 300000
+tcp_establish_timeout   = 5000
+
+[online.monitor.display]
+throughput    = true
+mempool_usage = true

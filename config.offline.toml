@@ -1,0 +1,73 @@
+# Retina runtime config for zoom_capture — OFFLINE mode.
+#
+# Same binary as config.toml (live capture), same #[filter("udp")]/
+# #[filter("tcp")] callbacks in main.rs — only which section this file
+# has (`[online]` vs `[offline]`) decides which mode runs.
+# `retina-core`'s own `load_config()` panics unless *exactly one* of
+# `online`/`offline` is set (core/src/config.rs), so this is a separate
+# file rather than a section to uncomment in config.toml — swapping
+# between modes means passing a different file to `-c`, not editing one
+# file back and forth:
+#
+#   sudo -E ./target/release/zoom_capture -c config.offline.toml
+#
+# (build.sh/run.sh are hardcoded to config.toml; for offline runs, call
+# the release binary directly with -c as above instead of using them.)
+#
+# NOTE ON SUDO/HUGEPAGES: offline mode is *not* DPDK-free. Confirmed
+# from core/src/runtime/offline.rs: it still allocates every packet's
+# Mbuf from a DPDK mempool (`OfflineRuntime::get_mempool_raw()` calls
+# `dpdk::rte_mempool_lookup`), and config.rs's `get_eal_params()` still
+# builds full DPDK EAL init args regardless of online/offline — the only
+# thing offline mode skips is binding a live NIC/PCI device. So the same
+# hugepage setup and (very likely) the same `sudo` requirement as live
+# capture still apply; try without sudo first if that's inconvenient,
+# and fall back to sudo -E if DPDK/EAL init fails.
+#
+# Also FYI: this lab's core/src/runtime/offline.rs runs every replayed
+# packet through a CAPWAP-preprocessing step before it reaches the
+# #[filter] callbacks (stripping CAPWAP tunnel headers if present). This
+# is transparent to zoom_capture's own code — main.rs's callbacks only
+# ever see the CAPWAP-stripped inner packet, same as they would in
+# online mode on a network with CAPWAP-tunneled traffic — but worth
+# knowing about if capture counts look off compared to a raw tcpdump
+# count of the same pcap file.
+
+main_core = 0
+
+[mempool]
+# Smaller than config.toml's (which is sized for a live multi-queue NIC
+# capture) — offline mode is single-core (see config.rs's own doc
+# comment: "Offline mode runs using a single core") and replays one file
+# at a time, so it doesn't need the same headroom. Matches the scale of
+# retina-core's own bundled default offline example (core/src/config.rs's
+# `default_config()`).
+capacity   = 8192
+cache_size = 512
+
+[offline]
+# Path to the .pcap/.pcapng file to replay, relative to wherever the
+# binary is *run from* (offline.rs opens this with `Capture::from_file`
+# as-is — no directory-of-files support and no glob expansion built in,
+# one file per run). Point this at one of the re-validation deck's own
+# captures to re-run this crate's classification against known traffic,
+# e.g.:
+pcap = "./A_caps/mix1a.pcapng"
+
+# Frames larger than this are silently skipped (offline.rs: `if
+# frame.header.len as usize > mtu { continue }`) rather than erroring —
+# so a too-low mtu here would look like packets going missing, not a
+# clear failure. 9702 accommodates jumbo frames; this only needs to be
+# lower than that if you specifically want oversized/malformed frames
+# excluded rather than processed.
+mtu = 9702
+
+[conntrack]
+# Same values as config.toml's [conntrack] — these tuning knobs apply
+# equally regardless of online/offline.
+max_connections      = 5000000
+max_out_of_order     = 1000
+timeout_resolution   = 100
+udp_inactivity_timeout  = 60000
+tcp_inactivity_timeout  = 300000
+tcp_establish_timeout   = 5000
