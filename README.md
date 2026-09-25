@@ -1,7 +1,6 @@
 # zoom_capture
 
-Retina-based passive capture of Zoom traffic, for research/education —
-same purpose as `vpn_capture`, targeted at a different application.
+Retina-based passive capture of Zoom traffic
 
 ## Status
 
